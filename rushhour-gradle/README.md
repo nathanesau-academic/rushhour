@@ -1,11 +1,8 @@
-# Assignment 2 Template
+# rushhour-gradle
 
 Instructions:
 
 ```bash
 # run unit tests
-gradlew clean test
-
-# create zip submission
-gradlew createSubmission
+gradlew build
 ```
