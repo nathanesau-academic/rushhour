@@ -4,6 +4,7 @@ re-write a-star solve in python
 import copy
 import os
 from typing import List
+from string import ascii_lowercase
 
 
 BASEDIR = os.path.dirname(os.path.realpath(__file__))
@@ -13,15 +14,15 @@ INPUT_DIR = f"{BASEDIR}/../jams"
 class Puzzle:
     """
     variables: grid, car_names, car_orientation, car_size, fixed_position
-    functions: get_grid, get_num_cars, get_fixed_position,
-               get_car_orientation, get_car_size
+    functions: get_num_cars, get_car_orientation, get_car_size,
+               get_fixed_position, get_initial_node
     """
 
-    def __init__(self, grid: List[List[str]], car_names: set, car_orientation: dict,
-                 car_size: dict, fixed_position: dict):
+    def __init__(self, initial_grid: List[List[int]], num_cars: int, car_orientation: list,
+                 car_size: list, fixed_position: list):
         
-        self.grid = grid
-        self.car_names = car_names
+        self.initial_grid = initial_grid
+        self.num_cars = num_cars        
         self.car_orientation = car_orientation
         self.car_size = car_size
         self.fixed_position = fixed_position
@@ -30,32 +31,29 @@ class Puzzle:
         # for stats purpose
         self.search_count = 1
 
-    def get_grid(self) -> List[List[str]]:
+    def get_num_cars(self):
         """
-        return puzzle grid
+        number of unique types of cars
         """
-        return self.grid
+        return self.num_cars
 
-    def get_car_names(self) -> set:
-        return self.car_names
-
-    def get_car_orientation(self, car_name) -> bool:
+    def get_car_orientation(self, v) -> bool:
         """
         return True if vertical, False otherwise
         """
-        return self.car_orientation[car_name]
+        return self.car_orientation[v]
 
-    def get_car_size(self, car_name) -> int:
+    def get_car_size(self, v) -> int:
         """
         return size of car
         """
-        return self.car_size[car_name]
+        return self.car_size[v]
 
-    def get_fixed_position(self, car_name) -> int:
+    def get_fixed_position(self, v) -> int:
         """
         return col if vertical, row otherwise
         """
-        return self.fixed_position[car_name]
+        return self.fixed_position[v]
 
     def get_initial_node(self):
         return self.initial_node
@@ -66,12 +64,11 @@ def read_board(file) -> Puzzle:
     for example, following are expected:
     
         num_cars = 8
-        car_orientation = {'x': False, 'a': True, 'b': False, 'c': True,
-                           'd': False, 'e': True, 'f': False, 'g': True}
-        car_size = {'x': 2, 'a': 3, 'b': 2, 'c': 3, 'd': 3, 'e': 2, 'f': 2, 'g': 3}
-        fixed_position = {'x': 2, 'a': 0, 'b': 0, 'c': 3, 'd': 5, 'e': 0, 'f': 4, 'g': 5}
+        car_orientation = [False, True, False, True, False, True, False, True]
+        car_size = [2, 3, 2, 3, 3, 2, 2, 3]
+        fixed_position = [2, 0, 0, 3, 5, 0, 4, 5]
 
-        variable_position = {'x': 1, 'a': 1, 'b': 0, 'c': 1, 'd': 2, 'e': 4, 'f': 4, 'g': 0}
+        variable_position = [1, 1, 0, 1, 2, 4, 4, 0]
     """
 
     with open(file) as f:
@@ -80,13 +77,24 @@ def read_board(file) -> Puzzle:
     grid = [list(line) for line in data.splitlines()]
 
     car_names = set([it for sl in grid for it in sl if it != '.'])
-    car_orientation = {}
-    car_size = {}
-    fixed_position = {}
-    variable_position = {}
+    car_numbers = dict((k, ascii_lowercase.index(k) + 1 if k != 'x' else 0) for k in car_names)
+    num_cars = len(car_numbers)
+    car_orientation = [0 for _ in range(num_cars)]
+    car_size = [0 for _ in range(num_cars)]
+    fixed_position = [0 for _ in range(num_cars)]
+    variable_position = [0 for _ in range(num_cars)]
 
-    for car_name in car_names:
-        squares = [(i, j) for i in range(6) for j in range(6) if grid[i][j] == car_name]
+    # replace car_names with car_numbers
+    for i in range(6):
+        for j in range(6):
+            if grid[i][j] == '.':
+                grid[i][j] = -1
+            else:
+                grid[i][j] = car_numbers[grid[i][j]]
+
+    for v in range(num_cars):
+
+        squares = [(i, j) for i in range(6) for j in range(6) if grid[i][j] == v]
         # True if vertical, False otherwise
         orientation = False if any(s[1] != squares[0][1] for s in squares[1:]) else True
         size = len(squares)
@@ -95,12 +103,15 @@ def read_board(file) -> Puzzle:
         # row if vertical, col otherwise
         vp = squares[0][0] if orientation else squares[0][1]
 
-        car_orientation[car_name] = orientation
-        car_size[car_name] = size
-        fixed_position[car_name] = fp
-        variable_position[car_name] = vp
+        car_orientation[v] = orientation
+        car_size[v] = size
+        fixed_position[v] = fp
+        variable_position[v] = vp
 
-    puzzle = Puzzle(grid, car_names, car_orientation, car_size, fixed_position)
+    # transpose grid
+    grid = [*zip(*grid)]
+
+    puzzle = Puzzle(grid, num_cars, car_orientation, car_size, fixed_position)
 
     state = State(puzzle, variable_position)
     initial_node = Node(state, 0, None)
@@ -112,7 +123,7 @@ def read_board(file) -> Puzzle:
 class State:
     """
     variables: puzzle, var_pos
-    methods: is_goal, expand
+    methods: is_goal, get_grid, expand
     """
 
     def __init__(self, puzzle: Puzzle, var_pos):
@@ -123,7 +134,27 @@ class State:
         """
         return True if puzzle solved, False otherwise
         """
-        return self.var_pos['x'] == 5
+        return self.var_pos[0] == 5
+
+    def get_grid(self):
+        """
+        return grid with var_pos applied
+        """
+        grid = [[-1 for _ in range(6)] for _ in range(6)]
+        for v in range(self.puzzle.get_num_cars()):
+            orientation = self.puzzle.get_car_orientation(v)
+            size = self.puzzle.get_car_size(v)
+            fp = self.puzzle.get_fixed_position(v)
+            if v == 0 and (self.var_pos[v] + size) > 6:
+                size -= 1
+            if orientation:  # vertical
+                for d in range(size):
+                    grid[fp][self.var_pos[v] + d] = v
+            else:  # horizontal
+                for d in range(size):
+                    grid[self.var_pos[v] + d][fp] = v
+
+        return grid
 
     def expand(self):
         """
@@ -131,32 +162,36 @@ class State:
         """
 
         # reference to grid
-        grid = self.puzzle.get_grid()
+        grid = self.get_grid()
+        num_cars = self.puzzle.get_num_cars()
         new_states: List[State] = []
         
-        for car_name in self.puzzle.get_car_names():
+        for v in range(num_cars):
             
-            p = self.var_pos[car_name]         
-            fp = self.puzzle.get_fixed_position(car_name)
-            orientation = self.puzzle.get_car_orientation(car_name)
+            p = self.var_pos[v]         
+            fp = self.puzzle.get_fixed_position(v)
+            orientation = self.puzzle.get_car_orientation(v)
             
             for np in range(p-1, -1, -1):
-                if orientation and grid[np][fp] != '.':  # VERTICAL: col is fixed
+                if orientation and grid[fp][np] >= 0:  # VERTICAL: col is fixed
                     break
-                if not orientation and grid[fp][np] != '.':  # HORIZONTAL: row if fixed
+                if not orientation and grid[np][fp] >= 0:  # HORIZONTAL: row if fixed
                     break
                 new_var_pos = copy.deepcopy(self.var_pos)
-                new_var_pos[car_name] = np
+                new_var_pos[v] = np
                 new_states.append(State(self.puzzle, new_var_pos))
 
-            car_size = self.puzzle.get_car_size(car_name)
-            for np in range(p+car_size, 6):
-                if orientation and grid[np][fp] != '.':  # VERTICAL: col is fixed
+            car_size = self.puzzle.get_car_size(v)
+            
+            for np in range(p+car_size, 7):
+                if np < 6 and (orientation and grid[fp][np] >= 0):  # VERTICAL: col is fixed
                     break
-                if not orientation and grid[fp][np] != '.':  # HORIZONTAL: row fixed
+                if np < 6 and (not orientation and grid[np][fp] >= 0):  # HORIZONTAL: row fixed
+                    break
+                if np == 6 and v != 0:
                     break
                 new_var_pos = copy.deepcopy(self.var_pos)
-                new_var_pos[car_name] = np - car_size + 1
+                new_var_pos[v] = np - car_size + 1
                 new_states.append(State(self.puzzle, new_var_pos))
 
         # for stats purpose
@@ -236,7 +271,6 @@ class AStar:
             # pop from front
             current: Node = open.pop(0)
 
-            # check for solution
             if current.state.is_goal():
                 path = self.build_path(current)
                 return path
@@ -263,11 +297,18 @@ class AStar:
             pass
 
 
+def pretty_print_path():
+    """
+    print path using "car_name" -> left 2, etc.
+    """
+    pass
+
+
 if __name__ == "__main__":
 
     puzzle = read_board(f"{INPUT_DIR}/jam_1.txt")
     solver = AStar(puzzle)
 
-    # jam_1.txt should be solvable with search count ~ 11587
     path = solver.solve()
+    print(f"final search_count: {solver.puzzle.search_count}")
     print(path)
