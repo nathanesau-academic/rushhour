@@ -25,24 +25,24 @@ import Heuristics.ZeroHeuristic;
 public class RushHour {
 
 	/**
-	 * The main for running all puzzles with all heuristics, and printing out
-	 * all solution paths as well as a final summary table.
+	 * The main for running all puzzles with all heuristics, and printing out all
+	 * solution paths as well as a final summary table.
 	 */
 	public static void main(String argv[]) throws FileNotFoundException, IOException {
 
-	// read all the puzzles in file named by first argument
-    String filename;	
-    
-    try {
-    	filename = argv[0];
-    } catch(ArrayIndexOutOfBoundsException e) {
-    	filename = "jams.txt";
-    }
-    
-	Puzzle[] puzzles = Puzzle.readPuzzlesFromFile(filename);
+		// read all the puzzles in file named by first argument
+		String filename;
+
+		try {
+			filename = argv[0];
+		} catch (ArrayIndexOutOfBoundsException e) {
+			filename = "jams.txt";
+		}
+
+		Puzzle[] puzzles = Puzzle.readPuzzlesFromFile(filename);
 
 		boolean showTime = false;
-	
+
 		String[] heuristic_names = null;
 		int num_puzzles = puzzles.length; // puzzles.length;
 		int num_heuristics = 0;
@@ -57,10 +57,8 @@ public class RushHour {
 			System.out.println("puzzle = " + puzzles[i].getName());
 
 			Heuristic[] heuristics = { // these are the heuristics to be used
-					new ZeroHeuristic(puzzles[i]),
-					new BlockingHeuristic(puzzles[i]),
-					new AdvancedHeuristic(puzzles[i])
-				};
+					new ZeroHeuristic(puzzles[i]), new BlockingHeuristic(puzzles[i]),
+					new AdvancedHeuristic(puzzles[i]) };
 
 			if (i == 0) {
 				num_heuristics = heuristics.length;
@@ -80,10 +78,10 @@ public class RushHour {
 				System.out.println("heuristic = " + heuristic_names[h]);
 
 				puzzles[i].resetSearchCount();
-				
+
 				long startTime = System.currentTimeMillis();
 				AStar search = new AStar(puzzles[i], heuristics[h]);
-				long endTime   = System.currentTimeMillis();
+				long endTime = System.currentTimeMillis();
 
 				if (search.path == null) {
 					System.out.println("NO SOLUTION FOUND.");
@@ -99,7 +97,8 @@ public class RushHour {
 					soln_depth[i][h] = search.path.length - 1;
 					duration[i][h] = endTime - startTime;
 
-					System.out.println("nodes expanded: " + num_expanded[i][h] + ", soln depth: " + soln_depth[i][h] + ", duration: " + duration[i][h]);
+					System.out.println("nodes expanded: " + num_expanded[i][h] + ", soln depth: " + soln_depth[i][h]
+							+ ", duration: " + duration[i][h]);
 
 				}
 			}
@@ -146,11 +145,12 @@ public class RushHour {
 				if (soln_depth[i][h] < 0) {
 					System.out.print(" |  ** search failed ** ");
 				} else {
-					System.out.print(" | " + left_pad(Integer.toString(num_expanded[i][h]), 8) + " "
-							+ left_pad(Integer.toString(soln_depth[i][h]), 4) + " " + left_pad(
-									brfac_nf.format(BranchingFactor.compute(num_expanded[i][h], soln_depth[i][h])), 7)
-							+ (showTime ? left_pad(Long.toString(duration[i][h]), 6) : "")
-							);
+					System.out
+							.print(" | " + left_pad(Integer.toString(num_expanded[i][h]), 8) + " "
+									+ left_pad(Integer.toString(soln_depth[i][h]), 4) + " "
+									+ left_pad(brfac_nf
+											.format(BranchingFactor.compute(num_expanded[i][h], soln_depth[i][h])), 7)
+									+ (showTime ? left_pad(Long.toString(duration[i][h]), 6) : ""));
 				}
 			}
 			System.out.println();
